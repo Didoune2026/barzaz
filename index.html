@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Barzaz</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f8f9fa; color: #1a1a1a; padding: 24px; max-width: 900px; margin: 0 auto; }
+  h1 { font-size: 1.2rem; font-weight: 600; margin-bottom: 6px; }
+  .subtitle { font-size: 0.85rem; color: #777; margin-bottom: 20px; }
+  .search-bar { width: 100%; padding: 10px 14px; border: 1.5px solid #ddd; border-radius: 8px; font-size: 0.95rem; margin-bottom: 18px; outline: none; }
+  .search-bar:focus { border-color: #555; }
+  .tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 20px; }
+  .tab { padding: 6px 14px; border-radius: 20px; border: 1.5px solid #ddd; background: white; cursor: pointer; font-size: 0.8rem; color: #555; }
+  .tab.active { background: #1a1a1a; color: white; border-color: #1a1a1a; }
+  .selection-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 20px; background: white; padding: 10px 14px; border-radius: 10px; border: 1.5px solid #ddd; }
+  .selection-display { flex: 1; font-size: 1.2rem; min-height: 30px; word-break: break-all; color: #333; }
+  .selection-placeholder { color: #bbb; font-size: 0.85rem; }
+  .btn { padding: 7px 14px; border-radius: 8px; border: none; cursor: pointer; font-size: 0.82rem; font-weight: 500; }
+  .btn-dark { background: #1a1a1a; color: white; }
+  .btn-light { background: white; color: #999; border: 1.5px solid #ddd; }
+  .section { margin-bottom: 28px; }
+  .section-title { font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: #999; margin-bottom: 12px; }
+  .emoji-grid { display: flex; flex-wrap: wrap; gap: 6px; }
+  .emoji-item { position: relative; }
+  .emoji-btn { font-size: 1.5rem; width: 46px; height: 46px; display: flex; align-items: center; justify-content: center; border-radius: 8px; border: 1.5px solid transparent; background: white; cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,0.07); transition: all 0.12s; }
+  .emoji-btn:hover { border-color: #bbb; transform: scale(1.12); }
+  .tooltip { position: absolute; bottom: 52px; left: 50%; transform: translateX(-50%); background: #1a1a1a; color: white; font-size: 0.65rem; padding: 3px 8px; border-radius: 5px; white-space: nowrap; pointer-events: none; opacity: 0; transition: opacity 0.1s; z-index: 10; }
+  .emoji-item:hover .tooltip { opacity: 1; }
+  .toast { position: fixed; bottom: 24px; right: 24px; background: #1a1a1a; color: white; padding: 10px 18px; border-radius: 8px; font-size: 0.85rem; opacity: 0; pointer-events: none; transition: opacity 0.2s; z-index: 100; }
+  .toast.show { opacity: 1; }
+  .no-results { color: #aaa; font-size: 0.9rem; padding: 20px 0; }
+  .cat-note { font-size: 0.78rem; color: #666; background: #f0f4ff; border-left: 3px solid #6b8cff; padding: 8px 12px; border-radius: 0 6px 6px 0; margin-bottom: 14px; line-height: 1.5; }
+</style>
+</head>
+<body>
+
+<h1>Barzaz</h1>
+<p class="subtitle">Cliquez pour copier un emoji · Construisez une séquence dans la barre de sélection</p>
+
+<div class="selection-bar">
+  <div class="selection-display" id="sel-display"><span class="selection-placeholder">Cliquez sur des emojis pour les accumuler ici...</span></div>
+  <button class="btn btn-light" onclick="clearSel()">✕</button>
+  <button class="btn btn-dark" onclick="copySel()">Copier tout</button>
+</div>
+
+<input type="text" class="search-bar" id="search" placeholder="Rechercher..." oninput="doSearch(this.value)" />
+
+<div class="tabs" id="tabs"></div>
+<div id="content"></div>
+<div class="toast" id="toast"></div>
+
+<script>
+const cats = [
+  { id:"all", label:"Tous" },
+  { id:"immo", label:"Immobilier", emojis:[
+    {e:"🏠",n:"maison"},{e:"🏡",n:"maison jardin"},{e:"🏢",n:"immeuble bureau"},
+    {e:"🏗️",n:"construction chantier"},{e:"🏘️",n:"quartier résidentiel"},
+    {e:"🏛️",n:"bâtiment monument"},{e:"🏬",n:"commerce magasin"},
+    {e:"🏭",n:"entrepôt logistique"},{e:"🏪",n:"boutique"},
+    {e:"🏨",n:"hôtel"},{e:"🏦",n:"banque"},
+    {e:"🔑",n:"clé"},{e:"🗝️",n:"ancienne clé"},
+    {e:"🚪",n:"porte"},{e:"🪟",n:"fenêtre"},
+    {e:"🛋️",n:"canapé intérieur"},{e:"🛏️",n:"chambre lit"},
+    {e:"🚿",n:"salle de bain"},{e:"🪴",n:"plante intérieur"},
+    {e:"🌳",n:"arbre extérieur"},{e:"🅿️",n:"parking"},
+    {e:"📐",n:"plan architecture"},{e:"📏",n:"surface mesure"},
+    {e:"🔨",n:"travaux rénovation"},{e:"⚡",n:"énergie DPE"},
+    {e:"🌿",n:"écologie vert"},{e:"☀️",n:"exposition solaire"},
+    {e:"🌇",n:"ville urbain"},{e:"🗺️",n:"carte localisation"},
+    {e:"📍",n:"épingle adresse"},{e:"📌",n:"punaise localisation"},
+    {e:"🏙️",n:"skyline métropole"},{e:"🌉",n:"pont panorama"},
+    {e:"🏞️",n:"paysage nature"},{e:"🛖",n:"chalet maison bois"},
+    {e:"🪜",n:"échelle travaux"},{e:"🧱",n:"mur brique construction"},
+    {e:"🪣",n:"seau travaux"},{e:"🔩",n:"vis fixation"},
+    {e:"💧",n:"eau plomberie"},{e:"🌡️",n:"température chauffage"},
+  ]},
+  { id:"biz", label:"Business", emojis:[
+    {e:"📈",n:"croissance hausse"},{e:"📉",n:"baisse"},
+    {e:"💹",n:"marché financier"},{e:"💰",n:"argent budget"},
+    {e:"💶",n:"euro prix"},{e:"💳",n:"paiement"},
+    {e:"🤝",n:"partenariat accord"},{e:"✍️",n:"signature contrat"},
+    {e:"📝",n:"notes document"},{e:"📋",n:"liste document"},
+    {e:"📊",n:"graphique rapport"},{e:"📁",n:"dossier"},
+    {e:"📅",n:"calendrier rendez-vous"},{e:"🔍",n:"recherche analyse"},
+    {e:"💡",n:"idée innovation"},{e:"🎯",n:"objectif cible"},
+    {e:"✅",n:"validé succès"},{e:"❌",n:"refus non"},
+    {e:"⚠️",n:"attention alerte"},{e:"🔒",n:"sécurité"},
+    {e:"📣",n:"annonce communication"},{e:"🏆",n:"succès récompense"},
+    {e:"🥇",n:"premier podium"},{e:"📩",n:"email entrant"},
+    {e:"📤",n:"envoyer"},{e:"📥",n:"recevoir"},
+    {e:"🧾",n:"facture reçu"},{e:"📜",n:"contrat bail"},
+    {e:"🏷️",n:"prix étiquette"},{e:"🔖",n:"référence dossier"},
+    {e:"🗃️",n:"archivage classement"},{e:"🖊️",n:"stylo rédaction"},
+    {e:"🤑",n:"rentabilité rendement"},{e:"💸",n:"dépense investissement"},
+    {e:"🏅",n:"certification label"},{e:"📎",n:"pièce jointe"},
+  ]},
+  { id:"sentiments", label:"Réactions", emojis:[
+    {e:"😊",n:"sourire positif"},{e:"😀",n:"sourire large"},
+    {e:"🙂",n:"légèrement souriant"},{e:"😎",n:"cool confiant"},
+    {e:"🤩",n:"enthousiaste"},{e:"🤔",n:"réflexion"},
+    {e:"😲",n:"surprise"},{e:"😅",n:"soulagement"},
+    {e:"🫡",n:"respect"},{e:"🫶",n:"bienveillance"},
+    {e:"👏",n:"applaudissement bravo"},{e:"🙏",n:"merci"},
+    {e:"💪",n:"force détermination"},{e:"🤓",n:"expert"},
+    {e:"❤️",n:"amour passion"},{e:"💙",n:"confiance fidélité"},
+    {e:"💚",n:"nature écologie"},{e:"🖤",n:"élégance premium"},
+    {e:"🤍",n:"simplicité blanc"},{e:"😤",n:"détermination fermeté"},
+    {e:"🥹",n:"émotion touchant"},{e:"😌",n:"calme sérénité"},
+    {e:"🫠",n:"dépassé situation complexe"},{e:"🤭",n:"discret confidence"},
+    {e:"😬",n:"inconfort gêne"},{e:"🧐",n:"analyse observation"},
+    {e:"🤜",n:"solidarité punch"},{e:"👊",n:"accord engagement"},
+    {e:"✌️",n:"victoire paix"},{e:"🤙",n:"contact appel"},
+    {e:"👌",n:"parfait ok"},{e:"🫰",n:"snap idée"},
+    {e:"💔",n:"déception perte"},
+    {e:"😘",n:"affectueux bisou"},{e:"🥰",n:"adorable affection"},
+    {e:"😍",n:"coup de coeur admiratif"},{e:"😋",n:"gourmand savoureux"},
+    {e:"🙃",n:"second degré ironie"},{e:"🤪",n:"décalé fun"},
+  ]},
+  { id:"data", label:"Data", emojis:[
+    {e:"1️⃣",n:"un"},{e:"2️⃣",n:"deux"},{e:"3️⃣",n:"trois"},
+    {e:"4️⃣",n:"quatre"},{e:"5️⃣",n:"cinq"},{e:"6️⃣",n:"six"},
+    {e:"7️⃣",n:"sept"},{e:"8️⃣",n:"huit"},{e:"9️⃣",n:"neuf"},
+    {e:"🔟",n:"dix"},{e:"💯",n:"100 parfait"},
+    {e:"📊",n:"graphique données"},{e:"📈",n:"progression"},
+    {e:"🔢",n:"chiffres"},{e:"➕",n:"plus"},
+    {e:"➖",n:"moins"},{e:"⏱️",n:"temps durée"},
+    {e:"📆",n:"date"},{e:"🗓️",n:"agenda"},
+    {e:"☁️",n:"cloud"},{e:"🗄️",n:"base de données"},
+    {e:"🔄",n:"synchronisation"},
+  ]},
+  { id:"linkedin", label:"LinkedIn", emojis:[
+    {e:"👋",n:"bonjour salutation"},{e:"👀",n:"regarder découvrir"},
+    {e:"🙌",n:"bravo félicitations"},{e:"💪",n:"force motivation"},
+    {e:"🔥",n:"tendance viral"},{e:"⚡",n:"urgent rapide"},
+    {e:"🚀",n:"lancement croissance"},{e:"🎉",n:"fête lancement"},
+    {e:"🤔",n:"question réflexion"},{e:"💬",n:"commentaire discussion"},
+    {e:"👉",n:"pointer indiquer"},{e:"👆",n:"important vers haut"},
+    {e:"👇",n:"lien vers bas"},{e:"➡️",n:"suite flèche droite"},
+    {e:"🔗",n:"lien URL"},{e:"💎",n:"valeur premium"},
+    {e:"🌟",n:"star étoile"},{e:"✨",n:"nouveau brillant"},
+    {e:"🧠",n:"intelligence stratégie"},{e:"📚",n:"formation ressources"},
+    {e:"🎓",n:"expertise"},{e:"🗣️",n:"prise de parole"},
+    {e:"👥",n:"communauté équipe"},{e:"🌍",n:"monde international"},
+    {e:"🇫🇷",n:"france"},{e:"📍",n:"localisation ville"},
+    {e:"📅",n:"calendrier date événement"},{e:"🕐",n:"heure horaire événement"},
+  ]},
+  { id:"proptech", label:"PropTech", emojis:[
+    {e:"💻",n:"ordinateur digital"},{e:"📱",n:"mobile app"},
+    {e:"🖥️",n:"écran plateforme"},{e:"📡",n:"connexion réseau"},
+    {e:"☁️",n:"cloud sauvegarde"},{e:"🔐",n:"sécurité données"},
+    {e:"🛡️",n:"protection RGPD"},{e:"⚙️",n:"paramètres config"},
+    {e:"🔧",n:"outil technique"},{e:"🤖",n:"automatisation IA"},
+    {e:"🧩",n:"intégration module"},{e:"📲",n:"notification app"},
+    {e:"💾",n:"sauvegarde"},{e:"🗄️",n:"base données"},
+    {e:"🔌",n:"intégration API"},{e:"📷",n:"photo visite virtuelle"},
+    {e:"🎥",n:"vidéo visite"},{e:"🕶️",n:"réalité virtuelle VR"},
+    {e:"🔄",n:"mise à jour sync"},{e:"🆕",n:"nouvelle version"},
+  ]},
+  { id:"com", label:"Communication", emojis:[
+    {e:"📣",n:"annonce"},{e:"📢",n:"diffusion"},
+    {e:"🗞️",n:"presse article"},{e:"📰",n:"newsletter"},
+    {e:"✉️",n:"email"},{e:"💌",n:"message"},
+    {e:"📞",n:"téléphone appel"},{e:"🎙️",n:"podcast micro"},
+    {e:"🎤",n:"prise de parole"},{e:"🖼️",n:"visuel image"},
+    {e:"🎨",n:"design créatif"},{e:"✏️",n:"rédaction"},
+    {e:"📖",n:"guide contenu"},{e:"🔖",n:"marque-page"},
+    {e:"📫",n:"boîte mail"},{e:"📬",n:"courrier reçu"},
+  ]},
+  { id:"fleches", label:"Flèches & Symboles", emojis:[
+    {e:"➡️",n:"droite"},{e:"⬅️",n:"gauche"},
+    {e:"⬆️",n:"haut"},{e:"⬇️",n:"bas"},
+    {e:"↗️",n:"haut droite"},{e:"↘️",n:"bas droite"},
+    {e:"🔄",n:"cycle rotation"},{e:"↩️",n:"retour"},
+    {e:"▶️",n:"play démarrer"},{e:"⏩",n:"avance rapide"},
+    {e:"✅",n:"check validé"},{e:"❗",n:"important"},
+    {e:"❓",n:"question"},{e:"‼️",n:"double exclamation"},
+    {e:"🔷",n:"losange bleu"},{e:"🔹",n:"petit losange bleu"},
+    {e:"🔸",n:"petit losange orange"},{e:"▪️",n:"carré noir"},
+    {e:"🔵",n:"cercle bleu"},{e:"🟢",n:"cercle vert"},
+    {e:"🔴",n:"cercle rouge"},{e:"🟡",n:"cercle jaune"},
+    {e:"⚫",n:"cercle noir"},{e:"⚪",n:"cercle blanc"},
+    {e:"💠",n:"losange bleu creux"},
+  ]},
+  { id:"drapeaux", label:"Drapeaux", note:"✓ LinkedIn et Instagram affichent ces drapeaux correctement via leur propre moteur (Twemoji). L'aperçu peut sembler cassé dans la page HTML sous Windows — ce n'est pas ce que verront tes lecteurs.", emojis:[
+    // Europe
+    {e:"🇫🇷",n:"france"},{e:"🇩🇪",n:"allemagne"},{e:"🇪🇸",n:"espagne"},
+    {e:"🇮🇹",n:"italie"},{e:"🇧🇪",n:"belgique"},{e:"🇳🇱",n:"pays-bas"},
+    {e:"🇵🇹",n:"portugal"},{e:"🇨🇭",n:"suisse"},{e:"🇦🇹",n:"autriche"},
+    {e:"🇵🇱",n:"pologne"},{e:"🇸🇪",n:"suède"},{e:"🇩🇰",n:"danemark"},
+    {e:"🇳🇴",n:"norvège"},{e:"🇫🇮",n:"finlande"},{e:"🇨🇿",n:"tchéquie"},
+    {e:"🇷🇴",n:"roumanie"},{e:"🇭🇺",n:"hongrie"},{e:"🇬🇷",n:"grèce"},
+    {e:"🇸🇰",n:"slovaquie"},{e:"🇧🇬",n:"bulgarie"},{e:"🇭🇷",n:"croatie"},
+    {e:"🇸🇮",n:"slovénie"},{e:"🇱🇺",n:"luxembourg"},{e:"🇮🇪",n:"irlande"},
+    {e:"🇬🇧",n:"royaume-uni"},{e:"🇺🇦",n:"ukraine"},{e:"🇷🇸",n:"serbie"},
+    {e:"🇲🇹",n:"malte"},{e:"🇨🇾",n:"chypre"},{e:"🇮🇸",n:"islande"},
+    {e:"🇪🇺",n:"union européenne"},
+    // G20 hors Europe déjà listée
+    {e:"🇺🇸",n:"états-unis"},{e:"🇨🇳",n:"chine"},{e:"🇯🇵",n:"japon"},
+    {e:"🇮🇳",n:"inde"},{e:"🇧🇷",n:"brésil"},{e:"🇨🇦",n:"canada"},
+    {e:"🇦🇺",n:"australie"},{e:"🇲🇽",n:"mexique"},{e:"🇰🇷",n:"corée du sud"},
+    {e:"🇮🇩",n:"indonésie"},{e:"🇸🇦",n:"arabie saoudite"},{e:"🇿🇦",n:"afrique du sud"},
+    {e:"🇦🇷",n:"argentine"},{e:"🇹🇷",n:"turquie"},{e:"🇷🇺",n:"russie"},
+    // Bonus marchés immobiliers notables
+    {e:"🇦🇪",n:"émirats arabes unis dubai"},{e:"🇸🇬",n:"singapour"},
+    {e:"🇲🇦",n:"maroc"},{e:"🇹🇳",n:"tunisie"},{e:"🇨🇭",n:"suisse"},
+  ]},
+];
+
+let sel = "";
+let activeTab = "all";
+let searchTerm = "";
+
+function allEmojis() {
+  const seen = new Set(), arr = [];
+  cats.filter(c=>c.id!=="all").forEach(c=>c.emojis.forEach(e=>{if(!seen.has(e.e)){seen.add(e.e);arr.push(e);}}));
+  return arr;
+}
+
+function renderTabs() {
+  document.getElementById("tabs").innerHTML = cats.map(c=>
+    `<button class="tab${c.id===activeTab?" active":""}" onclick="setTab('${c.id}')">${c.label}</button>`
+  ).join("");
+}
+
+function setTab(id) {
+  activeTab = id; searchTerm = "";
+  document.getElementById("search").value = "";
+  renderTabs(); renderContent();
+}
+
+function renderEmoji(e) {
+  return `<div class="emoji-item">
+    <button class="emoji-btn" onclick="pick('${e.e}')">${e.e}</button>
+    <div class="tooltip">${e.n}</div>
+  </div>`;
+}
+
+function renderContent() {
+  const el = document.getElementById("content");
+  if (searchTerm) {
+    const t = searchTerm.toLowerCase();
+    const res = allEmojis().filter(e=>e.n.includes(t)||e.e===t);
+    el.innerHTML = res.length
+      ? `<div class="section"><div class="section-title">Résultats (${res.length})</div><div class="emoji-grid">${res.map(renderEmoji).join("")}</div></div>`
+      : `<p class="no-results">Aucun résultat pour "${searchTerm}"</p>`;
+    return;
+  }
+  if (activeTab==="all") {
+    el.innerHTML = cats.filter(c=>c.id!=="all").map(c=>
+      `<div class="section"><div class="section-title">${c.label}</div>${c.note?`<p class="cat-note">${c.note}</p>`:""}<div class="emoji-grid">${c.emojis.map(renderEmoji).join("")}</div></div>`
+    ).join("");
+  } else {
+    const c = cats.find(c=>c.id===activeTab);
+    el.innerHTML = `<div class="section">${c.note?`<p class="cat-note">${c.note}</p>`:""}<div class="emoji-grid">${c.emojis.map(renderEmoji).join("")}</div></div>`;
+  }
+}
+
+function pick(emoji) {
+  sel += emoji;
+  const d = document.getElementById("sel-display");
+  d.innerHTML = sel ? `<span style="font-size:1.4rem">${sel}</span>` : `<span class="selection-placeholder">Cliquez sur des emojis pour les accumuler ici...</span>`;
+  navigator.clipboard.writeText(emoji).then(()=>toast(`${emoji} copié`));
+}
+
+function copySel() {
+  if (!sel) return;
+  navigator.clipboard.writeText(sel).then(()=>toast("Sélection copiée !"));
+}
+
+function clearSel() {
+  sel = "";
+  document.getElementById("sel-display").innerHTML = `<span class="selection-placeholder">Cliquez sur des emojis pour les accumuler ici...</span>`;
+}
+
+function doSearch(v) { searchTerm = v.trim(); renderContent(); }
+
+function toast(msg) {
+  const t = document.getElementById("toast");
+  t.textContent = msg; t.classList.add("show");
+  setTimeout(()=>t.classList.remove("show"), 1400);
+}
+
+renderTabs(); renderContent();
+</script>
+</body>
+</html>
